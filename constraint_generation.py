@@ -131,7 +131,7 @@ class ConstraintGenerator:
         os.makedirs(self.task_dir, exist_ok=True)
         # save query image
         image_path = os.path.join(self.task_dir, 'query_img.png')
-        cv2.imwrite(image_path, img[..., ::-1])
+        cv2.imencode('.png',img[..., ::-1])[1].tofile(image_path)
         # build prompt
         messages = self._build_prompt(image_path, instruction)
         # stream back the response

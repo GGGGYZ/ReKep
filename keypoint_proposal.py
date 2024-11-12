@@ -46,8 +46,14 @@ class KeypointProposer:
         return candidate_keypoints, projected
 
     def _preprocess(self, rgb, points, masks):
+        # 确保所有输入都在 CPU 上并转换为 numpy 数组
+        rgb = rgb.cpu().numpy() if isinstance(rgb, torch.Tensor) else rgb
+        points = points.cpu().numpy() if isinstance(points, torch.Tensor) else points
+        masks = masks.cpu().numpy() if isinstance(masks, torch.Tensor) else masks
+
         # convert masks to binary masks
         masks = [masks == uid for uid in np.unique(masks)]
+
         # ensure input shape is compatible with dinov2
         H, W, _ = rgb.shape
         patch_h = int(H // self.patch_size)
@@ -56,6 +62,7 @@ class KeypointProposer:
         new_W = patch_w * self.patch_size
         transformed_rgb = cv2.resize(rgb, (new_W, new_H))
         transformed_rgb = transformed_rgb.astype(np.float32) / 255.0  # float32 [H, W, 3]
+        
         # shape info
         shape_info = {
             'img_h': H,

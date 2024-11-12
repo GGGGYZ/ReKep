@@ -424,6 +424,7 @@ class ReKepOGEnv:
             save_path = os.path.join(save_dir, f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.mp4')
         video_writer = imageio.get_writer(save_path, fps=30)
         for rgb in self.video_cache:
+            rgb = rgb.cpu().numpy()
             video_writer.append_data(rgb)
         video_writer.close()
         return save_path
@@ -440,7 +441,7 @@ class ReKepOGEnv:
         current_rotmat = T.quat2mat(current_xyzw)
         target_rotmat = T.quat2mat(target_xyzw)
         # calculate position delta
-        pos_diff = (target_pos - current_pos).flatten()
+        pos_diff = (target_pos - current_pos.numpy()).flatten()
         pos_error = np.linalg.norm(pos_diff)
         # calculate rotation delta
         rot_error = angle_between_rotmat(current_rotmat, target_rotmat)
@@ -465,7 +466,7 @@ class ReKepOGEnv:
             # convert world pose to robot pose
             target_pose_robot = np.dot(self.world2robot_homo, T.convert_pose_quat2mat(target_pose_world))
             # convert to relative pose to be used with the underlying controller
-            relative_position = target_pose_robot[:3, 3] - self.robot.get_relative_eef_position()
+            relative_position = target_pose_robot[:3, 3] - self.robot.get_relative_eef_position().numpy()
             relative_quat = T.quat_distance(T.mat2quat(target_pose_robot[:3, :3]), self.robot.get_relative_eef_orientation())
             assert isinstance(self.robot, Fetch), "this action space is only for fetch"
             action = np.zeros(12)  # first 3 are base, which we don't use

@@ -121,43 +121,58 @@ def convert_quat(q, to="xyzw"):
     If to == 'xyzw', then the input is in 'wxyz' format, and vice-versa.
 
     Args:
-        q (np.array): a 4-dim array corresponding to a quaternion
+        q (np.array or torch.Tensor): a 4-dim array corresponding to a quaternion
         to (str): either 'xyzw' or 'wxyz', determining which convention to convert to.
     """
-    if to == "xyzw":
-        return q[[1, 2, 3, 0]]
-    if to == "wxyz":
-        return q[[3, 0, 1, 2]]
+    if isinstance(q, torch.Tensor):
+        if to == "xyzw":
+            return q[..., [1, 2, 3, 0]]
+        if to == "wxyz":
+            return q[..., [3, 0, 1, 2]]
+    else:
+        if to == "xyzw":
+            return q[..., [1, 2, 3, 0]]
+        if to == "wxyz":
+            return q[..., [3, 0, 1, 2]]
     raise Exception("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
-
 
 def quat_multiply(quaternion1, quaternion0):
     """
     Return multiplication of two quaternions (q1 * q0).
 
-    E.g.:
-    >>> q = quat_multiply([1, -2, 3, 4], [-5, 6, 7, 8])
-    >>> np.allclose(q, [-44, -14, 48, 28])
-    True
-
     Args:
-        quaternion1 (np.array): (x,y,z,w) quaternion
-        quaternion0 (np.array): (x,y,z,w) quaternion
+        quaternion1 (np.array or torch.Tensor): (x,y,z,w) quaternion
+        quaternion0 (np.array or torch.Tensor): (x,y,z,w) quaternion
 
     Returns:
-        np.array: (x,y,z,w) multiplied quaternion
+        np.array or torch.Tensor: (x,y,z,w) multiplied quaternion
     """
-    x0, y0, z0, w0 = quaternion0
-    x1, y1, z1, w1 = quaternion1
-    return np.array(
-        (
+    if isinstance(quaternion0, torch.Tensor) or isinstance(quaternion1, torch.Tensor):
+        # Convert to PyTorch tensors if not already
+        q0 = torch.as_tensor(quaternion0)
+        q1 = torch.as_tensor(quaternion1)
+        
+        x0, y0, z0, w0 = q0[..., 0], q0[..., 1], q0[..., 2], q0[..., 3]
+        x1, y1, z1, w1 = q1[..., 0], q1[..., 1], q1[..., 2], q1[..., 3]
+        
+        return torch.stack((
             x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
             -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
             x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
             -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
-        ),
-        dtype=quaternion0.dtype,
-    )
+        ), dim=-1)
+    else:
+        x0, y0, z0, w0 = quaternion0
+        x1, y1, z1, w1 = quaternion1
+        return np.array(
+            (
+                x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+                -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+                x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
+                -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
+            ),
+            dtype=quaternion0.dtype,
+        )
 
 
 def quat_conjugate(quaternion):
@@ -176,6 +191,9 @@ def quat_conjugate(quaternion):
     Returns:
         np.array: (x,y,z,w) quaternion conjugate
     """
+    # 确保 quaternion 是一个 NumPy 数组
+    if isinstance(quaternion, torch.Tensor):
+        quaternion = quaternion.detach().cpu().numpy()  # 转换为 NumPy 数组
     return np.array(
         (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
         dtype=quaternion.dtype,
@@ -443,7 +461,7 @@ def mat2euler(rmat):
     M = np.array(rmat, dtype=rmat.dtype, copy=False)[:3, :3]
     return R.from_matrix(M).as_euler("xyz")
 
-
+import torch
 def pose2mat(pose):
     """
     Converts pose to homogeneous matrix.
@@ -455,6 +473,10 @@ def pose2mat(pose):
     Returns:
         np.array: 4x4 homogeneous matrix
     """
+    print("***pose = ", pose)
+    if isinstance(pose[0], torch.Tensor):
+        pose = [p.detach().cpu().numpy() if isinstance(p, torch.Tensor) else p for p in pose]
+        
     homo_pose_mat = np.zeros((4, 4), dtype=pose[0].dtype)
     homo_pose_mat[:3, :3] = quat2mat(pose[1])
     homo_pose_mat[:3, 3] = np.array(pose[0], dtype=pose[0].dtype)
